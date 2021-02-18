@@ -10,7 +10,8 @@ use Quest\fields\LastName;
 use Quest\fields\LicenseExpiry;
 
 date_default_timezone_set('UTC');
-class App {
+class App
+{
 
     private const QUESTIONS = [
         FirstName::class,
@@ -24,6 +25,19 @@ class App {
      */
     private array $fields = [];
 
+    /**
+     * @var String
+     */
+    private string $convertDOB = "";
+
+    /**
+     * @var String
+     */
+    private string $convertDE = "";
+
+
+
+
     public function run()
     {
         $this->createFields();
@@ -33,25 +47,30 @@ class App {
 
     private function createFields(): void
     {
-        foreach(self::QUESTIONS as $questionClass) {
+        foreach (self::QUESTIONS as $questionClass) {
             $this->fields[] = new $questionClass();
         }
     }
 
     private function askQuestions(): void
     {
-        foreach($this->fields as $field) {
+        foreach ($this->fields as $field) {
             $field->getInput();
+            if ($field instanceof DateOfBirth || $field instanceof LicenseExpiry) {
+                $this->checkDateFormat($field);
+            }
         }
     }
 
     private function showResponses(): void
     {
         echo "\nResponses:\n";
-        foreach($this->fields as $field) {
-
+        foreach ($this->fields as $field) {
+            // Validate input date
             if ($field instanceof DateOfBirth) {
-                $this->checkDateFormat($field);
+                echo '  - ' . $field->getLabel() . ': ' . $this->convertDOB . "\n";
+            } else if($field instanceof LicenseExpiry) {
+                echo '  - ' . $field->getLabel() . ': ' . $this->convertDE . "\n";
             } else {
                 echo '  - ' . $field->getLabel() . ': ' . $field->getValue() . "\n";
             }
@@ -59,42 +78,49 @@ class App {
         echo "\nThank You!\n\n";
     }
 
-    private function checkDateFormat($field) : void {
-        $date = trim($field->getValue());
-        $dateType = [
-            "/^(0?[1-9]|[1-2][0-9]|3[0-1])(-|\/|.)(0?[1-9]|1[0-2])(-|\/|.)[0-9]{4}$/", // 28-08-1989 (-,.,/)
-            "/^(0?[1-9]|[1-2][0-9]|3[0-1])(-|\/|.)(0?[1-9]|1[0-2])(-|\/|.)[0-9]{2}$/", // 28-08-89 (-,.,/)
-            "/^[0-9]{4}(-|\/|.)(0?[1-9]|1[0-2])(-|\/|.)((0?[1-9])|([1-2][0-9])|(3[0-1]))$/", // 1989-08-28 | 1989-8-8
-            "/^[0-9]{2}(-|\/|.)(0?[1-9]|1[0-2])(-|\/|.)((0?[1-9])|([1-2][0-9])|(3[0-1]))$/" // 89-08-28 | 89-8-8
-        ];
+    private function checkDateFormat($field): void
+    {
+        try {
+            $date = trim($field->getValue());
+            $dateType = [
+                "/^(0?[1-9]|[1-2][0-9]|3[0-1])-(0?[1-9]|1[0-2])-[0-9]{2,4}$/",
+                "/^(0?[1-9]|[1-2][0-9]|3[0-1])\.(0?[1-9]|1[0-2])\.[0-9]{2,4}$/",
+                "/^(0?[1-9]|[1-2][0-9]|3[0-1])\/(0?[1-9]|1[0-2])\/[0-9]{2,4}$/",
+                "/^[0-9]{2,4}-(0?[1-9]|1[0-2])-((0?[1-9])|([1-2][0-9])|(3[0-1]))$/",
+                "/^[0-9]{2,4}\.(0?[1-9]|1[0-2])\.((0?[1-9])|([1-2][0-9])|(3[0-1]))$/",
+                "/^[0-9]{2,4}\/(0?[1-9]|1[0-2])\/((0?[1-9])|([1-2][0-9])|(3[0-1]))$/"
+            ];
 
-        // Mon 4th Nov, 2020
-        $dateFormat = 'D jS M, Y ';
-        $newDate = "Date is wrong";
-        $flash = false;
+            $dateFormat = 'D jS M, Y ';
+            $newDate = "";
+            $flash = false;
 
-        foreach ($dateType as $key => $value) {
-            if (preg_match($value, $date)) {
-                $reDate = preg_split("/[\s\/\-\.]+/", $date);
-                foreach ($reDate as $k => $v) {
-                    if (strlen($v) === 1) {
-                        $reDate[$k] = "0$v";
-                    }
+            foreach ($dateType as $key => $value) {
+                if (preg_match($value, $date)) {
+                    $reDate = preg_split("/[\s\/\-\.]+/", $date);
+                    $reDate = implode("-", $reDate);
+
+                    $newDate = date($dateFormat, strtotime($reDate));
+                    $flash = true;
+                    break;
                 }
-                $reDate = implode("-", $reDate);
-                $newDate = date($dateFormat, strtotime($reDate));
-                $flash = true;
-                break;
             }
-        }
-        if ($flash) {
-            $date_now = new DateTime();
-            $date2    = new DateTime($newDate);
-            if ($date_now < $date2) {
-                $newDate = "Date cannot greater than currently year";
-            }
-        }
 
-        echo '  - ' . $field->getLabel() . ': ' . $date . ' -> ' .' after converted: ' . $newDate . "\n";
+            if (!$flash) {
+                $mess =  $field->getLabel() . ' ' . $date . ' was wrong format.' . "\n";
+                throw new \Exception($mess);
+                exit();
+            }
+
+            if ($field instanceof DateOfBirth) {
+                $this->convertDOB = $newDate;
+            } else {
+                $this->convertDE = $newDate;
+            }
+
+        } catch (\Exception $e) {
+            echo 'Error message: ' . $e->getMessage();
+            exit();
+        }
     }
 }

@@ -19,6 +19,7 @@ abstract class AbstractField implements Input
     {
         $this->value = $value;
     }
+
     public function getValue(): string
     {
         return $this->value;
