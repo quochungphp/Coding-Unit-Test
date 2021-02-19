@@ -12,6 +12,9 @@ use Quest\fields\LicenseExpiry;
 date_default_timezone_set('UTC');
 class App
 {
+    protected $_self;
+
+    protected $_refl;
 
     private const QUESTIONS = [
         FirstName::class,
@@ -35,8 +38,11 @@ class App
      */
     private string $convertDE = "";
 
-
-
+    // Return intanceClass for checking unit test
+    public function getIntanceClass()
+    {
+      return $this::QUESTIONS;
+    }
 
     public function run()
     {
